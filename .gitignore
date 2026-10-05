@@ -1,0 +1,30 @@
+# .NET build artifacts
+bin/
+obj/
+*.log
+
+# Local databases & storage
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Environment & Secret files
+.env
+.env.*
+!.env.example
+appsettings.Development.json
+
+# IDE and Editor files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userprefs
+*.sln.docstates
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CampFix | Campus Facility Issue Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+
+  <!-- Top Navigation Bar -->
+  <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white font-bold text-xl">
+          <i class="fa-solid fa-wrench"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">CampFix</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">UG Campus</span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Campus Facility Incident & Triage Platform</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 sm:gap-4">
+        <!-- Live WebSocket Status Pill -->
+        <div id="connectionStatus" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 border border-slate-700 text-slate-400">
+          <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+          <span>Connecting...</span>
+        </div>
+
+        <a href="/swagger" target="_blank" class="hidden md:flex items-center gap-1.5 text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700 bg-slate-900/50 transition">
+          <i class="fa-solid fa-code text-indigo-400"></i>
+          <span>Swagger API</span>
+        </a>
+
+        <button onclick="openNewIssueModal()" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-semibold shadow-lg shadow-indigo-600/30 transition transform hover:-translate-y-0.5">
+          <i class="fa-solid fa-plus"></i>
+          <span>Report Issue</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Toast Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
+    
+    <!-- Hero Analytics Bar -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+          <span>TOTAL REPORTS</span>
+          <i class="fa-solid fa-layer-group text-slate-500"></i>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="statTotal" class="text-3xl font-bold text-white">0</span>
+          <span class="text-xs text-slate-500">campus-wide</span>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+          <span>REPORTED (NEW)</span>
+          <i class="fa-solid fa-inbox text-blue-400"></i>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="statReported" class="text-3xl font-bold text-blue-400">0</span>
+          <span class="text-xs text-slate-500">pending triage</span>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+          <span>IN PROGRESS</span>
+          <i class="fa-solid fa-screwdriver-wrench text-amber-400"></i>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="statInProgress" class="text-3xl font-bold text-amber-400">0</span>
+          <span class="text-xs text-slate-500">crew deployed</span>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+          <span>RESOLVED</span>
+          <i class="fa-solid fa-circle-check text-emerald-400"></i>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="statResolved" class="text-3xl font-bold text-emerald-400">0</span>
+          <span class="text-xs text-slate-500">repaired</span>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between col-span-2 sm:col-span-1">
+        <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+          <span>CRITICAL HAZARDS</span>
+          <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="statCritical" class="text-3xl font-bold text-rose-400">0</span>
+          <span class="text-xs text-slate-500">urgent action</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search & Filter Controls -->
+    <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-4">
+      <div class="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        
+        <!-- Search Input -->
+        <div class="relative flex-1">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+          <input 
+            type="text" 
+            id="searchInput" 
+            placeholder="Search issues by title, room, keywords..." 
+            class="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm text-slate-200 placeholder-slate-500 outline-none transition"
+            oninput="handleSearch()"
+          >
+        </div>
+
+        <!-- Filter Dropdowns -->
+        <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+          <select id="buildingFilter" onchange="fetchIssues()" class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:border-indigo-500 outline-none">
+            <option value="">All Buildings</option>
+          </select>
+
+          <select id="categoryFilter" onchange="fetchIssues()" class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:border-indigo-500 outline-none">
+            <option value="">All Categories</option>
+          </select>
+
+          <button onclick="resetFilters()" class="text-xs text-slate-400 hover:text-white px-3 py-2 rounded-lg border border-slate-800 hover:bg-slate-800 transition">
+            <i class="fa-solid fa-arrow-rotate-left mr-1"></i> Reset
+          </button>
+        </div>
+      </div>
+
+      <!-- Status Filter Tabs -->
+      <div class="flex items-center gap-1 overflow-x-auto border-t border-slate-800/80 pt-3 text-xs">
+        <button onclick="setStatusFilter('')" class="status-tab px-3.5 py-1.5 rounded-lg font-medium transition active-tab bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
+          All Issues
+        </button>
+        <button onclick="setStatusFilter('Reported')" class="status-tab px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">
+          Reported
+        </button>
+        <button onclick="setStatusFilter('Investigating')" class="status-tab px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">
+          Investigating
+        </button>
+        <button onclick="setStatusFilter('InProgress')" class="status-tab px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">
+          In Progress
+        </button>
+        <button onclick="setStatusFilter('Resolved')" class="status-tab px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">
+          Resolved
+        </button>
+        <button onclick="setStatusFilter('Closed')" class="status-tab px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">
+          Closed
+        </button>
+      </div>
+    </div>
+
+    <!-- Issues List / Feed -->
+    <div class="space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <span>Active Incident Feed</span>
+          <span id="issueCountBadge" class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">0</span>
+        </h2>
+        <span class="text-xs text-slate-500 flex items-center gap-1.5">
+          <i class="fa-solid fa-arrows-rotate text-slate-600"></i>
+          <span>Auto-synchronized via SignalR</span>
+        </span>
+      </div>
+
+      <!-- Feed Container -->
+      <div id="issuesContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Rendered by app.js -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden py-16 text-center bg-slate-900/40 rounded-xl border border-dashed border-slate-800">
+        <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mx-auto text-slate-500 mb-3">
+          <i class="fa-solid fa-circle-check text-xl"></i>
+        </div>
+        <h3 class="text-sm font-semibold text-slate-300">No issues found</h3>
+        <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">There are no facility reports matching your current filter criteria.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal: Report New Issue -->
+  <div id="newIssueModal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 my-8">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20">
+            <i class="fa-solid fa-bullhorn text-sm"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base">Report Facility Incident</h3>
+            <p class="text-xs text-slate-400">Submit a maintenance ticket to campus works</p>
+          </div>
+        </div>
+        <button onclick="closeNewIssueModal()" class="text-slate-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="newIssueForm" onsubmit="handleCreateIssue(event)" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Issue Title *</label>
+          <input 
+            type="text" 
+            name="title" 
+            required 
+            minlength="5" 
+            placeholder="e.g. Water leak near server rack or projector flickering" 
+            class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 focus:border-indigo-500 text-slate-200 outline-none"
+          >
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Campus Building *</label>
+            <select name="building" id="modalBuildingSelect" required class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 focus:border-indigo-500 text-slate-200 outline-none">
+              <!-- Populated by JS -->
+            </select>
+          </div>
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Room / Specific Spot *</label>
+            <input 
+              type="text" 
+              name="room" 
+              required 
+              placeholder="e.g. Room 14, Lab 3, Washroom" 
+              class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 focus:border-indigo-500 text-slate-200 outline-none"
+            >
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Category *</label>
+            <select name="category" id="modalCategorySelect" required class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 focus:border-indigo-500 text-slate-200 outline-none">
+              <!-- Populated by JS -->
+            </select>
+          </div>
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Priority Level *</label>
+            <select name="priority" id="modalPrioritySelect" required class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 focus:border-indigo-500 text-slate-200 outline-none">
+              <option value="Low">Low (Minor inconvenience)</option>
+              <option value="Medium" selected>Medium (Standard fault)</option>
+              <option value="High">High (Disrupts classes/work)</option>
+              <option value="Critical">Critical (Hazard / Safety risk)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Detailed Description *</label>
+          <textarea 
+            name="description" 
+            rows="3" 
+            required 
+            minlength="10" 
+            placeholder="Describe what is wrong, when it started, and any symptoms..." 
+            class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 focus:border-indigo-500 text-slate-200 outline-none"
+          ></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Your Full Name *</label>
+            <input 
+              type="text" 
+              name="reporterName" 
+              required 
+              placeholder="e.g. Kwesi Manu" 
+              class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 focus:border-indigo-500 text-slate-200 outline-none"
+            >
+          </div>
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">University Email *</label>
+            <input 
+              type="email" 
+              name="reporterEmail" 
+              required 
+              placeholder="e.g. kmanu@st.ug.edu.gh" 
+              class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 focus:border-indigo-500 text-slate-200 outline-none"
+            >
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeNewIssueModal()" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+            Cancel
+          </button>
+          <button type="submit" id="submitIssueBtn" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-600/30 transition">
+            Submit Incident Report
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Issue Details & Activity Audit Timeline -->
+  <div id="issueDetailModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-6 my-8">
+      
+      <!-- Modal Header -->
+      <div class="flex items-start justify-between border-b border-slate-800 pb-4">
+        <div>
+          <div class="flex items-center gap-2 mb-1.5">
+            <span id="detailPriorityBadge" class="text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider"></span>
+            <span id="detailCategoryBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700"></span>
+            <span id="detailStatusBadge" class="text-xs px-2.5 py-0.5 rounded-full font-semibold"></span>
+          </div>
+          <h3 id="detailTitle" class="text-lg font-bold text-white"></h3>
+          <p id="detailLocation" class="text-xs text-slate-400 mt-0.5"></p>
+        </div>
+        <button onclick="closeIssueDetailModal()" class="text-slate-400 hover:text-white text-xl">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Description & Metadata -->
+      <div class="bg-slate-950/60 rounded-xl p-4 border border-slate-800/80 space-y-3">
+        <p id="detailDescription" class="text-xs text-slate-300 leading-relaxed"></p>
+        <div class="flex flex-wrap items-center gap-4 pt-2 border-t border-slate-800/50 text-xs text-slate-400">
+          <div><i class="fa-regular fa-user mr-1 text-slate-500"></i> Reported by: <span id="detailReporter" class="text-slate-300 font-medium"></span></div>
+          <div><i class="fa-regular fa-clock mr-1 text-slate-500"></i> <span id="detailCreatedAt"></span></div>
+          <div id="detailAssignedContainer" class="hidden"><i class="fa-solid fa-user-gear mr-1 text-indigo-400"></i> Assigned: <span id="detailAssigned" class="text-indigo-300 font-medium"></span></div>
+        </div>
+      </div>
+
+      <!-- Staff Triage & Status Update Panel -->
+      <div class="bg-indigo-950/20 border border-indigo-500/20 rounded-xl p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-sliders"></i>
+            <span>Staff Triage & Lifecycle Controls</span>
+          </span>
+          <span class="text-[11px] text-slate-400">Campus Works Action</span>
+        </div>
+
+        <form id="updateStatusForm" onsubmit="handleStatusUpdate(event)" class="space-y-3 text-xs">
+          <input type="hidden" id="statusIssueId">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-medium text-slate-300 mb-1">Set New Status</label>
+              <select id="updateStatusSelect" class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none">
+                <option value="Reported">Reported</option>
+                <option value="Investigating">Investigating</option>
+                <option value="InProgress">In Progress</option>
+                <option value="Resolved">Resolved</option>
+                <option value="Closed">Closed</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-medium text-slate-300 mb-1">Assign Technician / Team</label>
+              <input type="text" id="updateAssignedTo" placeholder="e.g. Electrical Crew 2" class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none">
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Resolution / Triage Note</label>
+            <input type="text" id="updateStatusNotes" placeholder="e.g. Replaced capacitor, breaker reset, spare parts on order..." class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none">
+          </div>
+
+          <div class="flex justify-end gap-2">
+            <button type="submit" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition">
+              Update Status & Dispatch
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Activity & Audit Timeline -->
+      <div class="space-y-3">
+        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+          <i class="fa-solid fa-timeline"></i>
+          <span>Activity Audit Trail & Comments</span>
+        </h4>
+
+        <!-- Timeline items -->
+        <div id="detailTimelineContainer" class="space-y-2 max-h-52 overflow-y-auto pr-1">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Add Comment Form -->
+        <form id="addCommentForm" onsubmit="handleAddComment(event)" class="flex gap-2 pt-2 border-t border-slate-800">
+          <input 
+            type="text" 
+            id="commentTextInput" 
+            placeholder="Post an update or note to this ticket..." 
+            required 
+            class="flex-1 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 outline-none focus:border-indigo-500"
+          >
+          <button type="submit" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+            Post
+          </button>
+        </form>
+      </div>
+
+      <!-- Delete Button Option -->
+      <div class="flex justify-between items-center pt-2 border-t border-slate-800/60 text-xs">
+        <button onclick="handleDeleteCurrentIssue()" class="text-rose-400 hover:text-rose-300 flex items-center gap-1.5 transition">
+          <i class="fa-regular fa-trash-can"></i>
+          <span>Delete Ticket</span>
+        </button>
+        <button onclick="closeIssueDetailModal()" class="px-4 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-slate-900/60 border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <p>CampFix &bull; DCIT 318 Semester Project &bull; Built with ASP.NET Core &amp; SignalR</p>
+      <div class="flex items-center gap-3">
+        <span class="text-slate-400 font-mono text-[11px]">.NET 8.0</span>
+        <span>&bull;</span>
+        <span class="text-slate-400 font-mono text-[11px]" id="dbProviderBadge">PostgreSQL / SQLite</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- SignalR Client Library via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+  <!-- Application Client Script -->
+  <script src="/js/app.js"></script>
+</body>
+</html>
